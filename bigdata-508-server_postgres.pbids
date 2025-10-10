@@ -1,1 +1,0 @@
-{"version":"1.0","connections":[{"details":{"protocol":"postgresql","address":{"server":"bigdata-508-server.postgres.database.azure.com","database":"postgres"}},"options":null}]}
