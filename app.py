@@ -25,8 +25,8 @@ st_autorefresh(interval=10000, key="realtime_refresh")
 # ----------------------------------------------------
 # 🌐 DATABASE CONFIG - Azure PostgreSQL
 # ----------------------------------------------------
-# Azure PostgreSQL connection string
-AZURE_CONNECTION_STRING = "postgresql://postgres:Azure123!@#@bigdata-508-server.postgres.database.azure.com:5432/postgres?sslmode=require"
+# Azure PostgreSQL connection string - URL encoded password
+AZURE_CONNECTION_STRING = "postgresql://postgres:Azure123%21%40%23@bigdata-508-server.postgres.database.azure.com:5432/postgres?sslmode=require"
 
 # Parse connection string for individual components
 import urllib.parse as urlparse
