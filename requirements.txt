@@ -1,0 +1,24 @@
+# Azure PostgreSQL Streaming Analytics Pipeline Requirements
+# Smart City Air Quality Monitoring System
+
+# Core dependencies
+streamlit>=1.28.0
+streamlit-autorefresh>=0.0.6
+pandas>=2.0.0
+numpy>=1.24.0
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+plotly>=5.15.0
+
+# Machine Learning
+scikit-learn>=1.3.0
+joblib>=1.3.0
+
+# Data generation and utilities
+faker>=19.0.0
+python-dotenv>=1.0.0
+schedule>=1.2.0
+
+# Additional utilities
+requests>=2.31.0
+urllib3>=2.0.0
