@@ -33,7 +33,7 @@ if sys.platform == "win32":
     sys.stderr = codecs.getwriter("utf-8")(sys.stderr.detach())
 
 # Azure PostgreSQL connection
-AZURE_CONNECTION_STRING = "postgresql://postgres:Azure123!@#@bigdata-508-server.postgres.database.azure.com:5432/postgres?sslmode=require"
+AZURE_CONNECTION_STRING = "postgresql://postgres:Azure123@bigdata-508-server.postgres.database.azure.com:5432/postgres?sslmode=require"
 
 class AzureAQMSDeployer:
     def __init__(self):

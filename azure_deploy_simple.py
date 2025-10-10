@@ -27,7 +27,7 @@ from joblib import dump, load
 import pathlib
 
 # Azure PostgreSQL connection - URL encoded password
-AZURE_CONNECTION_STRING = "postgresql://postgres:Azure123%21%40%23@bigdata-508-server.postgres.database.azure.com:5432/postgres?sslmode=require"
+AZURE_CONNECTION_STRING = "postgresql://postgres:Azure123@bigdata-508-server.postgres.database.azure.com:5432/postgres?sslmode=require"
 
 class AzureAQMSDeployer:
     def __init__(self):

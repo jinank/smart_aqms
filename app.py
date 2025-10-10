@@ -26,7 +26,7 @@ st_autorefresh(interval=10000, key="realtime_refresh")
 # 🌐 DATABASE CONFIG - Azure PostgreSQL
 # ----------------------------------------------------
 # Azure PostgreSQL connection string - URL encoded password
-AZURE_CONNECTION_STRING = "postgresql://postgres:Azure123%21%40%23@bigdata-508-server.postgres.database.azure.com:5432/postgres?sslmode=require"
+AZURE_CONNECTION_STRING = "postgresql://postgres:Azure123@bigdata-508-server.postgres.database.azure.com:5432/postgres?sslmode=require"
 
 # Parse connection string for individual components
 import urllib.parse as urlparse
@@ -139,7 +139,7 @@ status_placeholder.text("Loading data from database...")
 df = load_data(window, limit)
 alerts = load_alerts()
 metrics = load_system_metrics()
-status_placeholder.text("✅ Data loaded successfully.")
+#status_placeholder.text("✅ Data loaded successfully.")
 
 if df.empty:
     st.warning("⚠️ No recent data. Please run the generator notebook.")
@@ -265,6 +265,6 @@ st.plotly_chart(fig3, use_container_width=True)
 # ----------------------------------------------------
 st.markdown("""
 ---
-**Smart AQMS** © 2025 — Real-time Environmental Intelligence  
-Built with ❤️ using Streamlit, PostgreSQL, and Scikit-learn.
+**Smart Air Quality Monitoring System** Real-time Environmental Intelligence  
+Built with ❤️ by Justin, Sravani and Jinank.
 """)
