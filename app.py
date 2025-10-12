@@ -61,7 +61,7 @@ def get_conn():
 @st.cache_data(ttl=30)  # Cache for 30 seconds to improve performance
 def load_data(minutes=180, limit=1000):
     """Load recent air quality data with enhanced features."""
-    # Optimized query with limit first, then join
+    # Optimized query with time filter and limit
     q = f"""
         SELECT a.record_id, a.station_id, a.ts, 
                a.pm25, a.co2_ppm, a.temperature_c, 
@@ -70,6 +70,7 @@ def load_data(minutes=180, limit=1000):
                p.aqi_pred
         FROM (
             SELECT * FROM scaqms.air_quality 
+            WHERE ts >= now() - INTERVAL '{minutes} minutes'
             ORDER BY ts DESC 
             LIMIT {limit}
         ) a
@@ -83,6 +84,8 @@ def load_data(minutes=180, limit=1000):
         return df
     except Exception as e:
         st.error(f"❌ Database error: {str(e)}")
+        st.cache_resource.clear()  # Clear cache on connection failure
+        st.cache_data.clear()      # Clear data cache too
         return pd.DataFrame()
 
 @st.cache_data(ttl=10)  # More frequent alert updates
@@ -176,8 +179,10 @@ if not metrics.empty:
         )
 
 # ----------------------------------------------------
-# 🌆 VISUALIZATIONS
+# 🌆 VISUALIZATIONS WITH TABS
 # ----------------------------------------------------
+st.caption("🔁 Dashboard auto-refreshes every 30 seconds")
+
 aqi_colors = {
     "Good": "#00E400",
     "Moderate": "#FFFF00",
@@ -186,80 +191,123 @@ aqi_colors = {
     None: "#808080"
 }
 
-# PM2.5 trends
-fig1 = px.line(
-    df.sort_values("ts"), x="ts", y="pm25", color="city_zone",
-    title=f"PM2.5 Levels per Zone (Last {window} minutes)",
-    labels={"ts": "Timestamp", "pm25": "PM2.5 (µg/m³)", "city_zone": "Zone"}
-)
-fig1.update_layout(legend=dict(orientation="h", y=1.05, x=1, xanchor="right"))
-st.plotly_chart(fig1, use_container_width=True)
+# Create tabs for better organization
+tabs = st.tabs(["📊 Overview", "🚨 Alerts", "🗺️ Map", "📈 System Metrics"])
 
-# AQI predictions
-fig2 = px.scatter(
-    df, x="ts", y="pm25", color="aqi_pred",
-    color_discrete_map=aqi_colors,
-    hover_data=["city_zone", "co2_ppm", "temperature_c", "humidity", "wind_speed"],
-    title="Predicted AQI over Time"
-)
-fig2.update_traces(marker=dict(size=9, line=dict(width=1, color='DarkSlateGrey')))
-fig2.update_layout(plot_bgcolor='white', paper_bgcolor='white')
-st.plotly_chart(fig2, use_container_width=True)
+# TAB 1: Overview Charts
+with tabs[0]:
+    # PM2.5 trends
+    fig1 = px.line(
+        df.sort_values("ts"), x="ts", y="pm25", color="city_zone",
+        title=f"PM2.5 Levels per Zone (Last {window} minutes)",
+        labels={"ts": "Timestamp", "pm25": "PM2.5 (µg/m³)", "city_zone": "Zone"}
+    )
+    fig1.update_layout(legend=dict(orientation="h", y=1.05, x=1, xanchor="right"))
+    st.plotly_chart(fig1, use_container_width=True)
 
-# ----------------------------------------------------
-# 🚨 ALERTS TABLE
-# ----------------------------------------------------
-st.subheader("🚨 Recent Alerts")
-if alerts.empty:
-    st.info("✅ No alerts detected recently.")
-else:
-    # Filter open alerts
-    unresolved = alerts[alerts['status'] == 'Open'] if 'status' in alerts.columns else alerts
-    
-    if not unresolved.empty:
-        st.warning(f"⚠️ {len(unresolved)} unresolved alerts detected!")
+    # AQI predictions
+    fig2 = px.scatter(
+        df, x="ts", y="pm25", color="aqi_pred",
+        color_discrete_map=aqi_colors,
+        hover_data=["city_zone", "co2_ppm", "temperature_c", "humidity", "wind_speed"],
+        title="Predicted AQI over Time"
+    )
+    fig2.update_traces(marker=dict(size=9, line=dict(width=1, color='DarkSlateGrey')))
+    fig2.update_layout(plot_bgcolor='white', paper_bgcolor='white')
+    st.plotly_chart(fig2, use_container_width=True)
+
+# TAB 2: Alerts
+with tabs[1]:
+    st.subheader("🚨 Recent Alerts")
+    if alerts.empty:
+        st.info("✅ No alerts detected recently.")
+    else:
+        # Filter open alerts
+        unresolved = alerts[alerts['status'] == 'Open'] if 'status' in alerts.columns else alerts
         
-        # Show severity breakdown
-        severity_counts = unresolved['severity'].value_counts()
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Critical", severity_counts.get('Critical', 0), delta="🚨")
-        col2.metric("High", severity_counts.get('High', 0), delta="🔴")
-        col3.metric("Moderate", severity_counts.get('Moderate', 0), delta="🟡")
-        col4.metric("Low", severity_counts.get('Low', 0), delta="🟢")
-    
-    # Display alerts with better formatting
-    alert_cols = ['created_at', 'city_zone', 'alert_type', 'severity', 'message']
-    if 'status' in alerts.columns:
-        alert_cols.append('status')
-    display_alerts = alerts[[col for col in alert_cols if col in alerts.columns]].copy()
-    display_alerts['created_at'] = pd.to_datetime(display_alerts['created_at']).dt.strftime('%Y-%m-%d %H:%M:%S')
-    
-    # Color code severity
-    def color_severity(val):
-        colors = {'Critical': 'background-color: #ffebee', 'High': 'background-color: #fff3e0',
-                 'Moderate': 'background-color: #fffde7', 'Low': 'background-color: #f3e5f5'}
-        return colors.get(val, '')
-    
-    styled_alerts = display_alerts.style.applymap(color_severity, subset=['severity'])
-    st.dataframe(styled_alerts, use_container_width=True, height=300)
+        if not unresolved.empty:
+            st.warning(f"⚠️ {len(unresolved)} unresolved alerts detected!")
+            
+            # Show severity breakdown (only if severity column exists)
+            if 'severity' in unresolved.columns:
+                severity_counts = unresolved['severity'].value_counts()
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("Critical", severity_counts.get('Critical', 0), delta="🚨")
+                col2.metric("High", severity_counts.get('High', 0), delta="🔴")
+                col3.metric("Moderate", severity_counts.get('Moderate', 0), delta="🟡")
+                col4.metric("Low", severity_counts.get('Low', 0), delta="🟢")
+        
+        # Display alerts with better formatting
+        alert_cols = ['created_at', 'city_zone', 'alert_type', 'severity', 'message']
+        if 'status' in alerts.columns:
+            alert_cols.append('status')
+        display_alerts = alerts[[col for col in alert_cols if col in alerts.columns]].copy()
+        display_alerts['created_at'] = pd.to_datetime(display_alerts['created_at']).dt.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Color code severity (only if severity column exists)
+        if 'severity' in display_alerts.columns:
+            def color_severity(val):
+                colors = {'Critical': 'background-color: #ffebee', 'High': 'background-color: #fff3e0',
+                         'Moderate': 'background-color: #fffde7', 'Low': 'background-color: #f3e5f5'}
+                return colors.get(val, '')
+            
+            styled_alerts = display_alerts.style.applymap(color_severity, subset=['severity'])
+            st.dataframe(styled_alerts, use_container_width=True, height=400)
+        else:
+            st.dataframe(display_alerts, use_container_width=True, height=400)
 
-# ----------------------------------------------------
-# 🗺️ MAP VIEW
-# ----------------------------------------------------
-st.subheader("🗺️ Latest Station Readings")
-latest = (
-    df.sort_values("ts")
-      .drop_duplicates(subset=["station_id"], keep="last")
-      .dropna(subset=["latitude", "longitude"])
-)
+# TAB 3: Map View
+with tabs[2]:
+    st.subheader("🗺️ Latest Station Readings")
+    latest = (
+        df.sort_values("ts")
+          .drop_duplicates(subset=["station_id"], keep="last")
+          .dropna(subset=["latitude", "longitude"])
+    )
 
-fig3 = px.scatter_mapbox(
-    latest, lat="latitude", lon="longitude", color="aqi_pred", size="pm25",
-    hover_name="city_zone", color_discrete_map=aqi_colors,
-    zoom=10, height=500, title="Geospatial AQI (Latest Readings)"
-)
-fig3.update_layout(mapbox_style="open-street-map")
-st.plotly_chart(fig3, use_container_width=True)
+    fig3 = px.scatter_mapbox(
+        latest, lat="latitude", lon="longitude", color="aqi_pred", size="pm25",
+        hover_name="city_zone", color_discrete_map=aqi_colors,
+        zoom=10, height=600, title="Geospatial AQI (Latest Readings)"
+    )
+    fig3.update_layout(mapbox_style="open-street-map")
+    st.plotly_chart(fig3, use_container_width=True)
+
+# TAB 4: System Metrics
+with tabs[3]:
+    st.subheader("📈 System Performance Metrics")
+    
+    if not metrics.empty:
+        # Convert timestamp
+        metrics_copy = metrics.copy()
+        metrics_copy["recorded_at"] = pd.to_datetime(metrics_copy["recorded_at"])
+        
+        # Get unique metric names
+        metric_names = metrics_copy["metric_name"].unique()
+        
+        # Display key metrics as line charts
+        st.markdown("### Metric Trends Over Time")
+        
+        # Create columns for metrics
+        col1, col2 = st.columns(2)
+        
+        metrics_displayed = 0
+        for metric_name in metric_names[:6]:  # Show top 6 metrics
+            sub = metrics_copy[metrics_copy["metric_name"] == metric_name].sort_values("recorded_at")
+            if not sub.empty and len(sub) > 1:
+                with (col1 if metrics_displayed % 2 == 0 else col2):
+                    st.markdown(f"**{metric_name.replace('_', ' ').title()}**")
+                    chart_data = sub.set_index("recorded_at")["metric_value"]
+                    st.line_chart(chart_data, height=200)
+                metrics_displayed += 1
+        
+        # Raw metrics table
+        st.markdown("### Recent Metrics Data")
+        display_metrics = metrics_copy[['metric_name', 'metric_value', 'metric_unit', 'recorded_at']].head(20)
+        display_metrics['recorded_at'] = display_metrics['recorded_at'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        st.dataframe(display_metrics, use_container_width=True)
+    else:
+        st.info("No system metrics data available yet.")
 
 # ----------------------------------------------------
 # ℹ️ FOOTER
