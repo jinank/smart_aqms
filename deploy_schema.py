@@ -2,7 +2,6 @@
 """
 Quick Schema Deployment for Smart AQMS
 """
-
 import psycopg2
 from sqlalchemy import create_engine, text
 import urllib.parse as urlparse

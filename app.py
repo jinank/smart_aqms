@@ -62,14 +62,17 @@ def get_conn():
 def load_data(minutes=180, limit=5000):
     """Load recent air quality data with enhanced features."""
     q = f"""
-        SELECT a.*, s.city_zone, s.latitude, s.longitude, s.sensor_type,
-               p.aqi_pred, p.proba_good, p.proba_moderate, p.proba_unhealthy, p.proba_hazardous,
-               p.confidence_score, p.model_version
-        FROM scaqms.air_quality a
-        JOIN scaqms.stations s ON a.station_id = s.station_id
-        LEFT JOIN scaqms.predictions p ON a.record_id = p.record_id
-        WHERE a.ts >= now() - INTERVAL '{minutes} minutes'
-        ORDER BY a.ts DESC
+        SELECT aqr.reading_id, aqr.station_id, aqr.timestamp as ts, 
+               aqr.pm25, aqr.co2_ppm, aqr.temperature_c, 
+               aqr.humidity_percent as humidity, aqr.wind_speed_ms as wind_speed,
+               s.city_zone, s.latitude, s.longitude, sn.sensor_type,
+               p.predicted_aqi_category as aqi_pred, p.confidence_score, p.model_version
+        FROM scaqms.air_quality_readings aqr
+        JOIN scaqms.stations s ON aqr.station_id = s.station_id
+        JOIN scaqms.sensors sn ON aqr.sensor_id = sn.sensor_id
+        LEFT JOIN scaqms.predictions p ON aqr.reading_id = p.reading_id
+        WHERE aqr.timestamp >= now() - INTERVAL '{minutes} minutes'
+        ORDER BY aqr.timestamp DESC
         LIMIT {limit};
     """
     try:
@@ -155,7 +158,7 @@ avg_pm25 = df['pm25'].mean() if not df.empty else 0
 avg_co2 = df['co2_ppm'].mean() if not df.empty else 0
 max_pm25 = df['pm25'].max() if not df.empty else 0
 total_records = len(df)
-active_alerts = len(alerts[alerts['is_resolved'] == False]) if not alerts.empty else 0
+active_alerts = len(alerts[alerts['status'] == 'Open']) if not alerts.empty and 'status' in alerts.columns else 0
 
 col1.metric("Avg PM2.5", f"{avg_pm25:.1f} μg/m³", 
            delta=f"{'🔴' if avg_pm25 > 35 else '🟡' if avg_pm25 > 12 else '🟢'}")
@@ -215,8 +218,8 @@ st.subheader("🚨 Recent Alerts")
 if alerts.empty:
     st.info("✅ No alerts detected recently.")
 else:
-    # Filter unresolved alerts
-    unresolved = alerts[alerts['is_resolved'] == False]
+    # Filter open alerts
+    unresolved = alerts[alerts['status'] == 'Open'] if 'status' in alerts.columns else alerts
     
     if not unresolved.empty:
         st.warning(f"⚠️ {len(unresolved)} unresolved alerts detected!")
@@ -230,7 +233,10 @@ else:
         col4.metric("Low", severity_counts.get('Low', 0), delta="🟢")
     
     # Display alerts with better formatting
-    display_alerts = alerts[['created_at', 'city_zone', 'alert_type', 'severity', 'message', 'anomaly_score']].copy()
+    alert_cols = ['created_at', 'city_zone', 'alert_type', 'severity', 'message']
+    if 'status' in alerts.columns:
+        alert_cols.append('status')
+    display_alerts = alerts[[col for col in alert_cols if col in alerts.columns]].copy()
     display_alerts['created_at'] = pd.to_datetime(display_alerts['created_at']).dt.strftime('%Y-%m-%d %H:%M:%S')
     
     # Color code severity

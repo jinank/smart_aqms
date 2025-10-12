@@ -24,7 +24,7 @@ import signal
 import sys
 
 # Azure PostgreSQL connection
-AZURE_CONNECTION_STRING = "postgresql://postgres:Azure123!@#@bigdata-508-server.postgres.database.azure.com:5432/postgres?sslmode=require"
+AZURE_CONNECTION_STRING = "postgresql://postgres:Azure123@bigdata-508-server.postgres.database.azure.com:5432/postgres?sslmode=require"
 
 class StreamingMonitor:
     def __init__(self):
