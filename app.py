@@ -61,33 +61,29 @@ def get_conn():
 @st.cache_data(ttl=5)  # Reduced cache time for more real-time updates
 def load_data(minutes=180, limit=5000):
     """Load recent air quality data with enhanced features."""
+    # Simpler query - get recent data without time filter first
     q = f"""
         SELECT a.record_id, a.station_id, a.ts, 
                a.pm25, a.co2_ppm, a.temperature_c, 
                a.humidity, a.wind_speed,
                s.city_zone, s.latitude, s.longitude,
-               p.aqi_pred, p.confidence_score, p.model_version
+               p.aqi_pred
         FROM scaqms.air_quality a
         JOIN scaqms.stations s ON a.station_id = s.station_id
         LEFT JOIN scaqms.predictions p ON a.record_id = p.record_id
-        WHERE a.ts >= now() - INTERVAL '{minutes} minutes'
         ORDER BY a.ts DESC
         LIMIT {limit};
     """
     try:
         conn = get_conn()
         df = pd.read_sql(q, conn)
+        st.success(f"✅ Loaded {len(df)} records from database")
         return df
     except Exception as e:
-        st.error(f"Database connection error: {e}")
-        st.cache_resource.clear()
-        try:
-            conn = get_conn()
-            df = pd.read_sql(q, conn)
-            return df
-        except Exception as e2:
-            st.error(f"Failed to reconnect: {e2}")
-            return pd.DataFrame()
+        st.error(f"❌ Database error: {str(e)}")
+        import traceback
+        st.error(traceback.format_exc())
+        return pd.DataFrame()
 
 @st.cache_data(ttl=10)  # More frequent alert updates
 def load_alerts(limit=200):
