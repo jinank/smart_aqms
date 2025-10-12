@@ -18,9 +18,9 @@ st.set_page_config(
 )
 
 # ----------------------------------------------------
-# 🔁 AUTO REFRESH (every 10 seconds for real-time feel)
+# 🔁 AUTO REFRESH (every 30 seconds to reduce load)
 # ----------------------------------------------------
-st_autorefresh(interval=10000, key="realtime_refresh")
+st_autorefresh(interval=30000, key="realtime_refresh")
 
 # ----------------------------------------------------
 # 🌐 DATABASE CONFIG - Azure PostgreSQL
@@ -58,31 +58,31 @@ def get_conn():
         password=PG_PASS
     )
 
-@st.cache_data(ttl=5)  # Reduced cache time for more real-time updates
-def load_data(minutes=180, limit=5000):
+@st.cache_data(ttl=30)  # Cache for 30 seconds to improve performance
+def load_data(minutes=180, limit=1000):
     """Load recent air quality data with enhanced features."""
-    # Simpler query - get recent data without time filter first
+    # Optimized query with limit first, then join
     q = f"""
         SELECT a.record_id, a.station_id, a.ts, 
                a.pm25, a.co2_ppm, a.temperature_c, 
                a.humidity, a.wind_speed,
                s.city_zone, s.latitude, s.longitude,
                p.aqi_pred
-        FROM scaqms.air_quality a
+        FROM (
+            SELECT * FROM scaqms.air_quality 
+            ORDER BY ts DESC 
+            LIMIT {limit}
+        ) a
         JOIN scaqms.stations s ON a.station_id = s.station_id
         LEFT JOIN scaqms.predictions p ON a.record_id = p.record_id
-        ORDER BY a.ts DESC
-        LIMIT {limit};
+        ORDER BY a.ts DESC;
     """
     try:
         conn = get_conn()
         df = pd.read_sql(q, conn)
-        st.success(f"✅ Loaded {len(df)} records from database")
         return df
     except Exception as e:
         st.error(f"❌ Database error: {str(e)}")
-        import traceback
-        st.error(traceback.format_exc())
         return pd.DataFrame()
 
 @st.cache_data(ttl=10)  # More frequent alert updates
@@ -125,7 +125,7 @@ def load_system_metrics(limit=100):
 # ----------------------------------------------------
 st.sidebar.header("Dashboard Controls")
 window = st.sidebar.slider("Time window (minutes)", 15, 720, 180, step=15)
-limit  = st.sidebar.number_input("Record limit", 500, 10000, 3000, step=500)
+limit  = st.sidebar.number_input("Record limit", 100, 5000, 1000, step=100)
 refresh_button = st.sidebar.button("🔄 Refresh Now")
 
 # ----------------------------------------------------
