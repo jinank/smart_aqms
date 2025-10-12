@@ -62,17 +62,16 @@ def get_conn():
 def load_data(minutes=180, limit=5000):
     """Load recent air quality data with enhanced features."""
     q = f"""
-        SELECT aqr.reading_id, aqr.station_id, aqr.timestamp as ts, 
-               aqr.pm25, aqr.co2_ppm, aqr.temperature_c, 
-               aqr.humidity_percent as humidity, aqr.wind_speed_ms as wind_speed,
-               s.city_zone, s.latitude, s.longitude, sn.sensor_type,
-               p.predicted_aqi_category as aqi_pred, p.confidence_score, p.model_version
-        FROM scaqms.air_quality_readings aqr
-        JOIN scaqms.stations s ON aqr.station_id = s.station_id
-        JOIN scaqms.sensors sn ON aqr.sensor_id = sn.sensor_id
-        LEFT JOIN scaqms.predictions p ON aqr.reading_id = p.reading_id
-        WHERE aqr.timestamp >= now() - INTERVAL '{minutes} minutes'
-        ORDER BY aqr.timestamp DESC
+        SELECT a.record_id, a.station_id, a.ts, 
+               a.pm25, a.co2_ppm, a.temperature_c, 
+               a.humidity, a.wind_speed,
+               s.city_zone, s.latitude, s.longitude,
+               p.aqi_pred, p.confidence_score, p.model_version
+        FROM scaqms.air_quality a
+        JOIN scaqms.stations s ON a.station_id = s.station_id
+        LEFT JOIN scaqms.predictions p ON a.record_id = p.record_id
+        WHERE a.ts >= now() - INTERVAL '{minutes} minutes'
+        ORDER BY a.ts DESC
         LIMIT {limit};
     """
     try:
